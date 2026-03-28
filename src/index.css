@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --font-heading: "Playfair Display", serif;
+  --font-body: "DM Sans", sans-serif;
+
+  --color-sage: #B2C9AD;
+  --color-sage-light: #D4E4D0;
+  --color-sage-dark: #5C7A56;
+  --color-cream: #FAF3E0;
+  --color-cream-dark: #EDE4CA;
+  --color-charcoal: #2D2D2D;
+  --color-warm-gray: #6B6B6B;
+  --color-offwhite: #FEFDF8;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-offwhite);
+  color: var(--color-charcoal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Performance: skip rendering offscreen cards */
+.card-auto-visible {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
+}
+
+/* Hide scrollbar for horizontal pill rows */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
