@@ -1,34 +1,76 @@
 /**
- * Library store — CRUD operations backed by localStorage.
- * Designed with a clean interface so it can be swapped for a REST API later.
+ * Library store — CRUD operations backed by Supabase (PostgreSQL).
+ *
+ * Every function is async. The DB uses snake_case columns;
+ * thin mappers translate to/from the camelCase TS models.
  */
 
-import type { Book, Member, Loan, LoanStatus } from "../data/models";
-import { seedBooks, seedMembers, seedLoans } from "../data/seed";
+import type { Book, Genre, Loan, LoanStatus, Member } from "../data/models";
+import { supabase } from "./supabase";
 
-const KEYS = {
-  books: "cafe-lib-books",
-  members: "cafe-lib-members",
-  loans: "cafe-lib-loans",
-} as const;
+/* ── Row ↔ Model mappers ─────────────────────────────────── */
+
+interface BookRow {
+  id: number;
+  isbn: string;
+  title: string;
+  author: string;
+  genre: string;
+  cover_image: string;
+  total_copies: number;
+  available_copies: number;
+  added_date: string;
+}
+
+interface MemberRow {
+  id: number;
+  name: string;
+  email: string;
+  joined_date: string;
+  active: boolean;
+}
+
+interface LoanRow {
+  id: number;
+  book_id: number;
+  member_id: number;
+  loan_date: string;
+  due_date: string;
+  return_date: string | null;
+  status: string;
+}
+
+const toBook = (r: BookRow): Book => ({
+  id: r.id,
+  isbn: r.isbn,
+  title: r.title,
+  author: r.author,
+  genre: r.genre as Genre,
+  coverImage: r.cover_image,
+  totalCopies: r.total_copies,
+  availableCopies: r.available_copies,
+  addedDate: r.added_date,
+});
+
+const toMember = (r: MemberRow): Member => ({
+  id: r.id,
+  name: r.name,
+  email: r.email,
+  joinedDate: r.joined_date,
+  active: r.active,
+});
+
+const toLoan = (r: LoanRow): Loan => ({
+  id: r.id,
+  bookId: r.book_id,
+  memberId: r.member_id,
+  loanDate: r.loan_date,
+  dueDate: r.due_date,
+  returnDate: r.return_date,
+  status: r.status as LoanStatus,
+});
 
 /* ── Helpers ──────────────────────────────────────────────── */
-
-function load<T>(key: string, fallback: T[]): T[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T[];
-  } catch { /* corrupt data — reset */ }
-  return fallback;
-}
-
-function save<T>(key: string, data: T[]) {
-  localStorage.setItem(key, JSON.stringify(data));
-}
-
-function nextId<T extends { id: number }>(arr: T[]): number {
-  return arr.length === 0 ? 1 : Math.max(...arr.map((i) => i.id)) + 1;
-}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -36,167 +78,254 @@ function today(): string {
 
 /* ── Books ────────────────────────────────────────────────── */
 
-export function getBooks(): Book[] {
-  return load<Book>(KEYS.books, seedBooks);
+export async function getBooks(): Promise<Book[]> {
+  const { data, error } = await supabase
+    .from("books")
+    .select("*")
+    .order("id");
+  if (error) throw error;
+  return (data as BookRow[]).map(toBook);
 }
 
-export function getBook(id: number): Book | undefined {
-  return getBooks().find((b) => b.id === id);
+export async function getBook(id: number): Promise<Book | undefined> {
+  const { data, error } = await supabase
+    .from("books")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toBook(data as BookRow) : undefined;
 }
 
-export function addBook(book: Omit<Book, "id" | "addedDate" | "availableCopies">): Book {
-  const books = getBooks();
-  const newBook: Book = {
-    ...book,
-    id: nextId(books),
-    availableCopies: book.totalCopies,
-    addedDate: today(),
-  };
-  books.push(newBook);
-  save(KEYS.books, books);
-  return newBook;
+export async function addBook(
+  book: Omit<Book, "id" | "addedDate" | "availableCopies">,
+): Promise<Book> {
+  const { data, error } = await supabase
+    .from("books")
+    .insert({
+      isbn: book.isbn,
+      title: book.title,
+      author: book.author,
+      genre: book.genre,
+      cover_image: book.coverImage,
+      total_copies: book.totalCopies,
+      available_copies: book.totalCopies,
+      added_date: today(),
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toBook(data as BookRow);
 }
 
-export function updateBook(id: number, updates: Partial<Omit<Book, "id">>): Book | undefined {
-  const books = getBooks();
-  const idx = books.findIndex((b) => b.id === id);
-  if (idx === -1) return undefined;
-  books[idx] = { ...books[idx], ...updates };
-  save(KEYS.books, books);
-  return books[idx];
+export async function updateBook(
+  id: number,
+  updates: Partial<Omit<Book, "id">>,
+): Promise<Book | undefined> {
+  const row: Record<string, unknown> = {};
+  if (updates.isbn !== undefined) row.isbn = updates.isbn;
+  if (updates.title !== undefined) row.title = updates.title;
+  if (updates.author !== undefined) row.author = updates.author;
+  if (updates.genre !== undefined) row.genre = updates.genre;
+  if (updates.coverImage !== undefined) row.cover_image = updates.coverImage;
+  if (updates.totalCopies !== undefined) row.total_copies = updates.totalCopies;
+  if (updates.availableCopies !== undefined)
+    row.available_copies = updates.availableCopies;
+  if (updates.addedDate !== undefined) row.added_date = updates.addedDate;
+
+  const { data, error } = await supabase
+    .from("books")
+    .update(row)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data ? toBook(data as BookRow) : undefined;
 }
 
-export function deleteBook(id: number): boolean {
-  const books = getBooks();
-  const filtered = books.filter((b) => b.id !== id);
-  if (filtered.length === books.length) return false;
-  save(KEYS.books, filtered);
-  return true;
+export async function deleteBook(id: number): Promise<boolean> {
+  const { error, count } = await supabase
+    .from("books")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  return (count ?? 1) > 0;
 }
 
 /* ── Members ──────────────────────────────────────────────── */
 
-export function getMembers(): Member[] {
-  return load<Member>(KEYS.members, seedMembers);
+export async function getMembers(): Promise<Member[]> {
+  const { data, error } = await supabase
+    .from("members")
+    .select("*")
+    .order("id");
+  if (error) throw error;
+  return (data as MemberRow[]).map(toMember);
 }
 
-export function getMember(id: number): Member | undefined {
-  return getMembers().find((m) => m.id === id);
+export async function getMember(id: number): Promise<Member | undefined> {
+  const { data, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toMember(data as MemberRow) : undefined;
 }
 
-export function addMember(member: Omit<Member, "id" | "joinedDate" | "active">): Member {
-  const members = getMembers();
-  const newMember: Member = {
-    ...member,
-    id: nextId(members),
-    joinedDate: today(),
-    active: true,
-  };
-  members.push(newMember);
-  save(KEYS.members, members);
-  return newMember;
+export async function addMember(
+  member: Omit<Member, "id" | "joinedDate" | "active">,
+): Promise<Member> {
+  const { data, error } = await supabase
+    .from("members")
+    .insert({
+      name: member.name,
+      email: member.email,
+      joined_date: today(),
+      active: true,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toMember(data as MemberRow);
 }
 
-export function updateMember(id: number, updates: Partial<Omit<Member, "id">>): Member | undefined {
-  const members = getMembers();
-  const idx = members.findIndex((m) => m.id === id);
-  if (idx === -1) return undefined;
-  members[idx] = { ...members[idx], ...updates };
-  save(KEYS.members, members);
-  return members[idx];
+export async function updateMember(
+  id: number,
+  updates: Partial<Omit<Member, "id">>,
+): Promise<Member | undefined> {
+  const row: Record<string, unknown> = {};
+  if (updates.name !== undefined) row.name = updates.name;
+  if (updates.email !== undefined) row.email = updates.email;
+  if (updates.active !== undefined) row.active = updates.active;
+  if (updates.joinedDate !== undefined) row.joined_date = updates.joinedDate;
+
+  const { data, error } = await supabase
+    .from("members")
+    .update(row)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data ? toMember(data as MemberRow) : undefined;
 }
 
 /* ── Loans ────────────────────────────────────────────────── */
 
-export function getLoans(): Loan[] {
-  return load<Loan>(KEYS.loans, seedLoans);
+export async function getLoans(): Promise<Loan[]> {
+  const { data, error } = await supabase
+    .from("loans")
+    .select("*")
+    .order("id");
+  if (error) throw error;
+  return (data as LoanRow[]).map(toLoan);
 }
 
-/** Refresh status of all loans based on today's date */
-export function refreshLoanStatuses(): Loan[] {
-  const loans = getLoans();
+/**
+ * Mark any loans past their due date as "overdue" in the DB,
+ * then return the full list.
+ */
+export async function refreshLoanStatuses(): Promise<Loan[]> {
   const todayStr = today();
-  let changed = false;
-  for (const loan of loans) {
-    if (!loan.returnDate && loan.dueDate < todayStr && loan.status !== "overdue") {
-      loan.status = "overdue";
-      changed = true;
-    }
-  }
-  if (changed) save(KEYS.loans, loans);
-  return loans;
+
+  // Bulk-update overdue in one query
+  await supabase
+    .from("loans")
+    .update({ status: "overdue" })
+    .is("return_date", null)
+    .lt("due_date", todayStr)
+    .neq("status", "overdue");
+
+  return getLoans();
 }
 
-export function checkoutBook(bookId: number, memberId: number, daysToLend = 30): Loan | null {
-  const books = getBooks();
-  const book = books.find((b) => b.id === bookId);
+export async function checkoutBook(
+  bookId: number,
+  memberId: number,
+  daysToLend = 30,
+): Promise<Loan | null> {
+  // 1. Check availability
+  const book = await getBook(bookId);
   if (!book || book.availableCopies <= 0) return null;
 
-  // decrease available copies
-  book.availableCopies -= 1;
-  save(KEYS.books, books);
+  // 2. Decrement available copies
+  await supabase
+    .from("books")
+    .update({ available_copies: book.availableCopies - 1 })
+    .eq("id", bookId);
 
+  // 3. Create loan
   const loanDate = today();
   const due = new Date();
   due.setDate(due.getDate() + daysToLend);
   const dueDate = due.toISOString().slice(0, 10);
 
-  const loans = getLoans();
-  const newLoan: Loan = {
-    id: nextId(loans),
-    bookId,
-    memberId,
-    loanDate,
-    dueDate,
-    returnDate: null,
-    status: "active",
-  };
-  loans.push(newLoan);
-  save(KEYS.loans, loans);
-  return newLoan;
+  const { data, error } = await supabase
+    .from("loans")
+    .insert({
+      book_id: bookId,
+      member_id: memberId,
+      loan_date: loanDate,
+      due_date: dueDate,
+      return_date: null,
+      status: "active",
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toLoan(data as LoanRow);
 }
 
-export function returnBook(loanId: number): Loan | null {
-  const loans = getLoans();
-  const loan = loans.find((l) => l.id === loanId);
-  if (!loan || loan.returnDate) return null;
+export async function returnBook(loanId: number): Promise<Loan | null> {
+  // 1. Get the loan
+  const { data: loanRow, error: fetchErr } = await supabase
+    .from("loans")
+    .select("*")
+    .eq("id", loanId)
+    .single();
+  if (fetchErr || !loanRow) return null;
+  const loan = toLoan(loanRow as LoanRow);
+  if (loan.returnDate) return null; // already returned
 
-  loan.returnDate = today();
-  loan.status = "returned";
-  save(KEYS.loans, loans);
+  // 2. Mark returned
+  const { data: updated, error: updateErr } = await supabase
+    .from("loans")
+    .update({ return_date: today(), status: "returned" })
+    .eq("id", loanId)
+    .select()
+    .single();
+  if (updateErr) throw updateErr;
 
-  // increase available copies
-  const books = getBooks();
-  const book = books.find((b) => b.id === loan.bookId);
+  // 3. Increment available copies
+  const book = await getBook(loan.bookId);
   if (book) {
-    book.availableCopies = Math.min(book.availableCopies + 1, book.totalCopies);
-    save(KEYS.books, books);
+    await supabase
+      .from("books")
+      .update({
+        available_copies: Math.min(book.availableCopies + 1, book.totalCopies),
+      })
+      .eq("id", book.id);
   }
 
-  return loan;
+  return toLoan(updated as LoanRow);
 }
 
-export function getActiveLoans(): Loan[] {
-  return refreshLoanStatuses().filter((l) => l.status !== "returned");
+export async function getActiveLoans(): Promise<Loan[]> {
+  const loans = await refreshLoanStatuses();
+  return loans.filter((l) => l.status !== "returned");
 }
 
-export function getOverdueLoans(): Loan[] {
-  return refreshLoanStatuses().filter((l) => l.status === "overdue");
+export async function getOverdueLoans(): Promise<Loan[]> {
+  const loans = await refreshLoanStatuses();
+  return loans.filter((l) => l.status === "overdue");
 }
 
 /** Get loan count per status */
-export function getLoanStats(): Record<LoanStatus, number> {
-  const loans = refreshLoanStatuses();
+export async function getLoanStats(): Promise<Record<LoanStatus, number>> {
+  const loans = await refreshLoanStatuses();
   return {
     active: loans.filter((l) => l.status === "active").length,
     overdue: loans.filter((l) => l.status === "overdue").length,
     returned: loans.filter((l) => l.status === "returned").length,
   };
-}
-
-/** Reset all data to seed defaults */
-export function resetData() {
-  localStorage.removeItem(KEYS.books);
-  localStorage.removeItem(KEYS.members);
-  localStorage.removeItem(KEYS.loans);
 }
