@@ -21,6 +21,8 @@ CREATE TABLE members (
   id          SERIAL  PRIMARY KEY,
   name        TEXT    NOT NULL,
   email       TEXT    NOT NULL,
+  phone       TEXT    NOT NULL DEFAULT '',
+  address     TEXT    NOT NULL DEFAULT '',
   joined_date DATE    NOT NULL DEFAULT CURRENT_DATE,
   active      BOOLEAN NOT NULL DEFAULT true
 );
@@ -65,12 +67,12 @@ INSERT INTO books (id, isbn, title, author, genre, cover_image, total_copies, av
   (14, '978-3-499-27178-1', 'Factfulness',                          'Hans Rosling',          'Sachbuch',    'https://images.unsplash.com/photo-1553729459-afe8f2e2ed08?w=400&h=600&fit=crop', 2, 2, '2026-03-10'),
   (15, '978-3-462-05032-2', 'Der Tunnel',                           'Friedrich Dürrenmatt',  'Sonstiges',   'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400&h=600&fit=crop', 1, 1, '2026-03-15');
 
-INSERT INTO members (id, name, email, joined_date, active) VALUES
-  (1, 'Anna Müller',   'anna@example.de',   '2025-09-10', true),
-  (2, 'Jonas Weber',   'jonas@example.de',  '2025-10-01', true),
-  (3, 'Lena Schmidt',  'lena@example.de',   '2025-11-15', true),
-  (4, 'Milo Hoffmann', 'milo@example.de',   '2026-01-05', true),
-  (5, 'Sophie Braun',  'sophie@example.de', '2026-02-20', false);
+INSERT INTO members (id, name, email, phone, address, joined_date, active) VALUES
+  (1, 'Anna Müller',   'anna@example.de',   '+49 170 1234567', 'Hauptstr. 12, 10115 Berlin',   '2025-09-10', true),
+  (2, 'Jonas Weber',   'jonas@example.de',  '+49 171 2345678', 'Bachweg 3, 80331 München',     '2025-10-01', true),
+  (3, 'Lena Schmidt',  'lena@example.de',   '+49 172 3456789', 'Lindenallee 7, 50667 Köln',    '2025-11-15', true),
+  (4, 'Milo Hoffmann', 'milo@example.de',   '',                '',                              '2026-01-05', true),
+  (5, 'Sophie Braun',  'sophie@example.de', '+49 174 5678901', 'Rosenstr. 22, 20095 Hamburg',   '2026-02-20', false);
 
 INSERT INTO loans (id, book_id, member_id, loan_date, due_date, return_date, status) VALUES
   (1, 1,  1, '2026-02-10', '2026-03-10', '2026-03-08', 'returned'),

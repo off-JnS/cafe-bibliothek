@@ -1,23 +1,46 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { Plus, BookOpen } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, X } from "lucide-react";
 import SearchBar from "../components/ui/SearchBar";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import CameraCapture from "../components/ui/CameraCapture";
 import Loading from "../components/ui/Loading";
 import { useDebounce } from "../hooks/useDebounce";
-import { getBooks, addBook, deleteBook } from "../services/libraryStore";
-import { genres, type Genre, type Book } from "../data/models";
+import {
+  getBooks,
+  addBook,
+  deleteBook,
+  updateBook,
+} from "../services/libraryStore";
+import {
+  getAllGenres,
+  addCustomGenre,
+  removeCustomGenre,
+  isCustomGenre,
+  defaultGenres,
+  type Genre,
+  type Book,
+} from "../data/models";
 
 export default function Books() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
-  const [genreFilter, setGenreFilter] = useState<Genre | "Alle">("Alle");
+  const [genreFilter, setGenreFilter] = useState<string>("Alle");
   const [modalOpen, setModalOpen] = useState(false);
   const [coverData, setCoverData] = useState("");
+
+  // Edit state
+  const [editingBook, setEditingBook] = useState<Book | null>(null);
+
+  // Genre management state
+  const [genreModalOpen, setGenreModalOpen] = useState(false);
+  const [newGenre, setNewGenre] = useState("");
+  const [allGenres, setAllGenres] = useState<string[]>(getAllGenres);
+
+  const refreshGenres = () => setAllGenres(getAllGenres());
 
   const refresh = useCallback(async () => {
     const data = await getBooks();
@@ -61,10 +84,58 @@ export default function Books() {
     refresh();
   };
 
+  const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingBook) return;
+    const fd = new FormData(e.currentTarget);
+    const newTotal = Number(fd.get("totalCopies")) || 1;
+    const oldTotal = editingBook.totalCopies;
+    const diff = newTotal - oldTotal;
+    const newAvailable = Math.max(0, editingBook.availableCopies + diff);
+
+    await updateBook(editingBook.id, {
+      title: fd.get("title") as string,
+      author: fd.get("author") as string,
+      isbn: fd.get("isbn") as string,
+      genre: fd.get("genre") as Genre,
+      coverImage: coverData || editingBook.coverImage,
+      totalCopies: newTotal,
+      availableCopies: newAvailable,
+    });
+    setEditingBook(null);
+    setCoverData("");
+    refresh();
+  };
+
+  const openEdit = (book: Book) => {
+    setEditingBook(book);
+    setCoverData(book.coverImage);
+  };
+
+  const closeEdit = () => {
+    setEditingBook(null);
+    setCoverData("");
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm("Buch wirklich löschen?")) return;
     await deleteBook(id);
     refresh();
+  };
+
+  const handleAddGenre = () => {
+    const trimmed = newGenre.trim();
+    if (!trimmed) return;
+    addCustomGenre(trimmed);
+    refreshGenres();
+    setNewGenre("");
+  };
+
+  const handleRemoveGenre = (genre: string) => {
+    if (!confirm(`Genre "${genre}" wirklich entfernen?`)) return;
+    removeCustomGenre(genre);
+    refreshGenres();
+    if (genreFilter === genre) setGenreFilter("Alle");
   };
 
   if (loading) return <Loading />;
@@ -81,9 +152,21 @@ export default function Books() {
             <h1 className="font-heading text-xl font-bold text-charcoal">
               Bücher
             </h1>
-            <Button size="sm" onClick={() => setModalOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" /> Neu
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  refreshGenres();
+                  setGenreModalOpen(true);
+                }}
+              >
+                Genres
+              </Button>
+              <Button size="sm" onClick={() => setModalOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" /> Neu
+              </Button>
+            </div>
           </div>
 
           {/* Search + genre filter */}
@@ -94,10 +177,10 @@ export default function Books() {
               placeholder="Titel, Autor oder ISBN…"
             />
             <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
-              {["Alle", ...genres].map((g) => (
+              {["Alle", ...allGenres].map((g) => (
                 <button
                   key={g}
-                  onClick={() => setGenreFilter(g as Genre | "Alle")}
+                  onClick={() => setGenreFilter(g)}
                   className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
                     genreFilter === g
                       ? "bg-sage-dark text-cream"
@@ -152,12 +235,22 @@ export default function Books() {
                     >
                       {book.availableCopies}/{book.totalCopies}
                     </span>
-                    <button
-                      onClick={() => handleDelete(book.id)}
-                      className="text-[11px] text-warm-gray/50 active:text-rose-600"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => openEdit(book)}
+                        className="text-[11px] text-warm-gray/50 transition-colors hover:text-sage-dark active:text-sage-dark"
+                        title="Bearbeiten"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(book.id)}
+                        className="text-[11px] text-warm-gray/50 transition-colors hover:text-rose-600 active:text-rose-600"
+                        title="Löschen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -171,7 +264,7 @@ export default function Books() {
         </div>
       </section>
 
-      {/* Add book modal — full screen on mobile */}
+      {/* Add book modal */}
       <Modal
         open={modalOpen}
         onClose={() => {
@@ -208,7 +301,7 @@ export default function Books() {
               name="genre"
               className="rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
             >
-              {genres.map((g) => (
+              {allGenres.map((g) => (
                 <option key={g} value={g}>
                   {g}
                 </option>
@@ -227,6 +320,139 @@ export default function Books() {
             Speichern
           </Button>
         </form>
+      </Modal>
+
+      {/* Edit book modal */}
+      <Modal
+        open={!!editingBook}
+        onClose={closeEdit}
+        title="Buch bearbeiten"
+      >
+        {editingBook && (
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div className="flex gap-4">
+              <CameraCapture value={coverData} onChange={setCoverData} />
+              <div className="flex-1 space-y-3">
+                <input
+                  name="title"
+                  required
+                  defaultValue={editingBook.title}
+                  placeholder="Titel *"
+                  className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+                />
+                <input
+                  name="author"
+                  required
+                  defaultValue={editingBook.author}
+                  placeholder="Autor *"
+                  className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+                />
+              </div>
+            </div>
+            <input
+              name="isbn"
+              defaultValue={editingBook.isbn}
+              placeholder="ISBN"
+              className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                name="genre"
+                defaultValue={editingBook.genre}
+                className="rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+              >
+                {allGenres.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="totalCopies"
+                type="number"
+                min={1}
+                defaultValue={editingBook.totalCopies}
+                placeholder="Anzahl"
+                className="rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+              />
+            </div>
+            <Button type="submit" className="w-full justify-center">
+              Änderungen speichern
+            </Button>
+          </form>
+        )}
+      </Modal>
+
+      {/* Genre management modal */}
+      <Modal
+        open={genreModalOpen}
+        onClose={() => setGenreModalOpen(false)}
+        title="Genres verwalten"
+      >
+        <div className="space-y-4">
+          {/* Existing genres */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-warm-gray">
+              Standard-Genres
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {defaultGenres.map((g) => (
+                <span
+                  key={g}
+                  className="rounded-full bg-sage-light/30 px-3 py-1 text-xs font-medium text-charcoal"
+                >
+                  {g}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom genres */}
+          {allGenres.length > defaultGenres.length && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-warm-gray">
+                Eigene Genres
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {allGenres
+                  .filter((g) => isCustomGenre(g))
+                  .map((g) => (
+                    <span
+                      key={g}
+                      className="flex items-center gap-1 rounded-full bg-sage-dark/10 px-3 py-1 text-xs font-medium text-charcoal"
+                    >
+                      {g}
+                      <button
+                        onClick={() => handleRemoveGenre(g)}
+                        className="ml-0.5 text-warm-gray transition-colors hover:text-rose-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add new genre */}
+          <div className="flex gap-2 pt-2">
+            <input
+              value={newGenre}
+              onChange={(e) => setNewGenre(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddGenre();
+                }
+              }}
+              placeholder="Neues Genre…"
+              className="flex-1 rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+            />
+            <Button size="sm" onClick={handleAddGenre}>
+              <Plus className="mr-1 h-4 w-4" /> Hinzufügen
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   );

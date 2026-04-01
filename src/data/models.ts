@@ -10,7 +10,7 @@ export type Genre =
   | "Philosophie"
   | "Sonstiges";
 
-export const genres: Genre[] = [
+export const defaultGenres: Genre[] = [
   "Roman",
   "Lyrik",
   "Sachbuch",
@@ -20,6 +20,40 @@ export const genres: Genre[] = [
   "Philosophie",
   "Sonstiges",
 ];
+
+const CUSTOM_GENRES_KEY = "cafe-bibliothek-custom-genres";
+
+function loadCustomGenres(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_GENRES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function getAllGenres(): string[] {
+  return [...defaultGenres, ...loadCustomGenres()];
+}
+
+export function addCustomGenre(genre: string): void {
+  const custom = loadCustomGenres();
+  const trimmed = genre.trim();
+  if (!trimmed || getAllGenres().includes(trimmed)) return;
+  custom.push(trimmed);
+  localStorage.setItem(CUSTOM_GENRES_KEY, JSON.stringify(custom));
+}
+
+export function removeCustomGenre(genre: string): void {
+  const custom = loadCustomGenres().filter((g) => g !== genre);
+  localStorage.setItem(CUSTOM_GENRES_KEY, JSON.stringify(custom));
+}
+
+export function isCustomGenre(genre: string): boolean {
+  return loadCustomGenres().includes(genre);
+}
+
+/** @deprecated Use getAllGenres() instead */
+export const genres = defaultGenres;
 
 export interface Book {
   id: number;
@@ -37,6 +71,8 @@ export interface Member {
   id: number;
   name: string;
   email: string;
+  phone: string;
+  address: string;
   joinedDate: string; // ISO
   active: boolean;
 }

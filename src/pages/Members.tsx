@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { Plus, UserCheck, UserX } from "lucide-react";
+import { Plus, UserCheck, UserX, Pencil, Phone, MapPin } from "lucide-react";
 import SearchBar from "../components/ui/SearchBar";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
@@ -15,6 +15,9 @@ export default function Members() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Edit state
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
 
   const refresh = useCallback(async () => {
     const data = await getMembers();
@@ -41,8 +44,24 @@ export default function Members() {
     await addMember({
       name: fd.get("name") as string,
       email: fd.get("email") as string,
+      phone: (fd.get("phone") as string) || "",
+      address: (fd.get("address") as string) || "",
     });
     setModalOpen(false);
+    refresh();
+  };
+
+  const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    const fd = new FormData(e.currentTarget);
+    await updateMember(editingMember.id, {
+      name: fd.get("name") as string,
+      email: fd.get("email") as string,
+      phone: (fd.get("phone") as string) || "",
+      address: (fd.get("address") as string) || "",
+    });
+    setEditingMember(null);
     refresh();
   };
 
@@ -83,29 +102,55 @@ export default function Members() {
             {filtered.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center gap-3 rounded-2xl bg-cream p-4 shadow-sm"
+                className="flex flex-col gap-2 rounded-2xl bg-cream p-4 shadow-sm"
               >
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${m.active ? "bg-sage-light text-sage-dark" : "bg-gray-100 text-gray-400"}`}
-                >
-                  {m.name.charAt(0)}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${m.active ? "bg-sage-light text-sage-dark" : "bg-gray-100 text-gray-400"}`}
+                  >
+                    {m.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-charcoal">
+                      {m.name}
+                    </p>
+                    <p className="truncate text-xs text-warm-gray">{m.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditingMember(m)}
+                      className="rounded-full p-1.5 text-warm-gray/60 transition-colors active:bg-sage-light/30 active:text-sage-dark"
+                      title="Bearbeiten"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => toggleActive(m.id, m.active)}
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        m.active
+                          ? "bg-sage-light text-sage-dark"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {m.active ? "Aktiv" : "Inaktiv"}
+                    </button>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-charcoal">
-                    {m.name}
-                  </p>
-                  <p className="truncate text-xs text-warm-gray">{m.email}</p>
-                </div>
-                <button
-                  onClick={() => toggleActive(m.id, m.active)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                    m.active
-                      ? "bg-sage-light text-sage-dark"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {m.active ? "Aktiv" : "Inaktiv"}
-                </button>
+                {/* Extra info row */}
+                {(m.phone || m.address) && (
+                  <div className="flex flex-wrap gap-3 pl-13 text-[11px] text-warm-gray">
+                    {m.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> {m.phone}
+                      </span>
+                    )}
+                    {m.address && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {m.address}
+                      </span>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -117,6 +162,8 @@ export default function Members() {
                 <tr className="border-b border-sage-light/40 text-xs uppercase tracking-wider text-warm-gray">
                   <th className="px-5 py-3">Name</th>
                   <th className="px-5 py-3">E-Mail</th>
+                  <th className="px-5 py-3">Telefon</th>
+                  <th className="px-5 py-3">Adresse</th>
                   <th className="px-5 py-3">Beigetreten</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3 text-right">Aktion</th>
@@ -132,6 +179,12 @@ export default function Members() {
                       {m.name}
                     </td>
                     <td className="px-5 py-3 text-warm-gray">{m.email}</td>
+                    <td className="px-5 py-3 text-warm-gray">
+                      {m.phone || "—"}
+                    </td>
+                    <td className="max-w-[160px] truncate px-5 py-3 text-warm-gray">
+                      {m.address || "—"}
+                    </td>
                     <td className="px-5 py-3 text-warm-gray">{m.joinedDate}</td>
                     <td className="px-5 py-3">
                       <span
@@ -146,12 +199,20 @@ export default function Members() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={() => toggleActive(m.id, m.active)}
-                        className="text-xs text-warm-gray transition-colors hover:text-sage-dark"
-                      >
-                        {m.active ? "Deaktivieren" : "Aktivieren"}
-                      </button>
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => setEditingMember(m)}
+                          className="text-xs text-warm-gray transition-colors hover:text-sage-dark"
+                        >
+                          Bearbeiten
+                        </button>
+                        <button
+                          onClick={() => toggleActive(m.id, m.active)}
+                          className="text-xs text-warm-gray transition-colors hover:text-sage-dark"
+                        >
+                          {m.active ? "Deaktivieren" : "Aktivieren"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -166,6 +227,7 @@ export default function Members() {
         </div>
       </section>
 
+      {/* Add member modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -185,10 +247,64 @@ export default function Members() {
             placeholder="E-Mail *"
             className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
           />
+          <input
+            name="phone"
+            type="tel"
+            placeholder="Telefonnummer"
+            className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+          />
+          <input
+            name="address"
+            placeholder="Adresse"
+            className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+          />
           <Button type="submit" className="w-full justify-center">
             Speichern
           </Button>
         </form>
+      </Modal>
+
+      {/* Edit member modal */}
+      <Modal
+        open={!!editingMember}
+        onClose={() => setEditingMember(null)}
+        title="Mitglied bearbeiten"
+      >
+        {editingMember && (
+          <form onSubmit={handleEdit} className="space-y-4">
+            <input
+              name="name"
+              required
+              defaultValue={editingMember.name}
+              placeholder="Name *"
+              className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+            />
+            <input
+              name="email"
+              type="email"
+              required
+              defaultValue={editingMember.email}
+              placeholder="E-Mail *"
+              className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+            />
+            <input
+              name="phone"
+              type="tel"
+              defaultValue={editingMember.phone}
+              placeholder="Telefonnummer"
+              className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+            />
+            <input
+              name="address"
+              defaultValue={editingMember.address}
+              placeholder="Adresse"
+              className="w-full rounded-lg border border-sage-light bg-offwhite px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sage-dark"
+            />
+            <Button type="submit" className="w-full justify-center">
+              Änderungen speichern
+            </Button>
+          </form>
+        )}
       </Modal>
     </>
   );

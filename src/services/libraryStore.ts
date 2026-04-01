@@ -26,6 +26,8 @@ interface MemberRow {
   id: number;
   name: string;
   email: string;
+  phone: string;
+  address: string;
   joined_date: string;
   active: boolean;
 }
@@ -56,6 +58,8 @@ const toMember = (r: MemberRow): Member => ({
   id: r.id,
   name: r.name,
   email: r.email,
+  phone: r.phone ?? "",
+  address: r.address ?? "",
   joinedDate: r.joined_date,
   active: r.active,
 });
@@ -181,6 +185,8 @@ export async function addMember(
     .insert({
       name: member.name,
       email: member.email,
+      phone: member.phone ?? "",
+      address: member.address ?? "",
       joined_date: today(),
       active: true,
     })
@@ -197,6 +203,8 @@ export async function updateMember(
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.email !== undefined) row.email = updates.email;
+  if (updates.phone !== undefined) row.phone = updates.phone;
+  if (updates.address !== undefined) row.address = updates.address;
   if (updates.active !== undefined) row.active = updates.active;
   if (updates.joinedDate !== undefined) row.joined_date = updates.joinedDate;
 

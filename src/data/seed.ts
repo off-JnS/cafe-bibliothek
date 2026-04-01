@@ -169,11 +169,11 @@ export const seedBooks: Book[] = [
 ];
 
 export const seedMembers: Member[] = [
-  { id: 1, name: "Anna Müller",    email: "anna@example.de",    joinedDate: "2025-09-10", active: true },
-  { id: 2, name: "Jonas Weber",    email: "jonas@example.de",   joinedDate: "2025-10-01", active: true },
-  { id: 3, name: "Lena Schmidt",   email: "lena@example.de",    joinedDate: "2025-11-15", active: true },
-  { id: 4, name: "Milo Hoffmann",  email: "milo@example.de",    joinedDate: "2026-01-05", active: true },
-  { id: 5, name: "Sophie Braun",   email: "sophie@example.de",  joinedDate: "2026-02-20", active: false },
+  { id: 1, name: "Anna Müller",    email: "anna@example.de",    phone: "+49 170 1234567", address: "Hauptstr. 12, 10115 Berlin",  joinedDate: "2025-09-10", active: true },
+  { id: 2, name: "Jonas Weber",    email: "jonas@example.de",   phone: "+49 171 2345678", address: "Bachweg 3, 80331 München",    joinedDate: "2025-10-01", active: true },
+  { id: 3, name: "Lena Schmidt",   email: "lena@example.de",    phone: "+49 172 3456789", address: "Lindenallee 7, 50667 Köln",   joinedDate: "2025-11-15", active: true },
+  { id: 4, name: "Milo Hoffmann",  email: "milo@example.de",    phone: "",                address: "",                             joinedDate: "2026-01-05", active: true },
+  { id: 5, name: "Sophie Braun",   email: "sophie@example.de",  phone: "+49 174 5678901", address: "Rosenstr. 22, 20095 Hamburg",  joinedDate: "2026-02-20", active: false },
 ];
 
 export const seedLoans: Loan[] = [

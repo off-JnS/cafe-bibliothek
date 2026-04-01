@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
+import PasswordGate from "./components/PasswordGate";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Books = lazy(() => import("./pages/Books"));
@@ -15,6 +16,7 @@ const Spinner = () => (
 
 export default function App() {
   return (
+    <PasswordGate>
     <Routes>
       <Route element={<Layout />}>
         <Route
@@ -51,5 +53,6 @@ export default function App() {
         />
       </Route>
     </Routes>
+    </PasswordGate>
   );
 }
