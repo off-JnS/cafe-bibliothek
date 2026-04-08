@@ -3,7 +3,12 @@ import { Lock } from "lucide-react";
 import Button from "./ui/Button";
 
 const LIBRARY_PASSWORD = "cafe2026";
-const SESSION_KEY = "cafe-bibliothek-auth";
+export const SESSION_KEY = "cafe-bibliothek-auth";
+
+export function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  window.location.reload();
+}
 
 interface Props {
   children: ReactNode;

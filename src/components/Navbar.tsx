@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
-import { BookOpen, LayoutDashboard, Library, Users, ArrowRightLeft } from "lucide-react";
+import { BookOpen, LayoutDashboard, Library, Users, ArrowRightLeft, LogOut } from "lucide-react";
+import { logout } from "./PasswordGate";
 
 const links = [
   { to: "/", label: "Home", icon: LayoutDashboard },
@@ -36,6 +37,14 @@ export default function Navbar() {
                 {label}
               </NavLink>
             ))}
+            <button
+              onClick={logout}
+              className="ml-2 flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-warm-gray transition-colors hover:bg-rose-50 hover:text-rose-600"
+              title="Abmelden"
+            >
+              <LogOut className="h-4 w-4" />
+              Abmelden
+            </button>
           </nav>
         </div>
       </header>
@@ -58,6 +67,13 @@ export default function Navbar() {
               {label}
             </NavLink>
           ))}
+          <button
+            onClick={logout}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-medium text-warm-gray transition-colors active:text-rose-600"
+          >
+            <LogOut className="h-5 w-5" />
+            Abmelden
+          </button>
         </div>
       </nav>
     </>
